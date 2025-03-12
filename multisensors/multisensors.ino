@@ -30,19 +30,19 @@ void loop() {
     op = map(val,base,offset,0,180);
 
     if(isDebug){
-      data += String(val) + ","+String(op)+",";
+      // data += String(val) + ","+String(op)+",";
       Serial.print(val); //raw value
       Serial.print(",");
       Serial.print(op); //mapped value
     }
     for(int i = 0;i < 3;i++){
       if(op < threshold[i]){
-        data += String(i);
+        // data += String(i);
         Serial.print(i);  //gesture
         break;
       }
     }
-    data += ",";
+    data += String(op)+",";
     Serial.print(",");
   }
   espSerial.println(data);
