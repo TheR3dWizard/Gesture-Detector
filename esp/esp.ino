@@ -5,7 +5,7 @@
 #define LED 3
 #define MAX_VALUES 5 // Define the number of expected values
 
-SoftwareSerial mySerial(4, 5);  // RX = GPIO4 (D2), TX = GPIO5 (D1)
+SoftwareSerial mySerial(14, 5);  // RX = GPI14 (D5), TX = GPIO5 (D1)
 const char* ssid = "MotoG6";
 const char* password = "12345678";
 WiFiClient client;

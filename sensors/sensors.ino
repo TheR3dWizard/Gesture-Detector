@@ -4,6 +4,8 @@
 #define NUM_GESTURES 7
 #define BUTTON 7
 #define HIST_LENGTH 1000
+#define NUM_ACTIONS 1
+#define MAX_ACTION_LENGTH 3
 
 int val = 0;
 int op = 0;
@@ -12,6 +14,7 @@ boolean isDebug = false;
 String data = "";
 SoftwareSerial espSerial(10, 11);
 
+int* gesture;
 const int threshold[3] = {60,120,500}; // 3 levels of bending for each finger
 const int flexPins[NUM_SENSORS] = {A0,A1,A2,A3,A4};
 int ranges[NUM_SENSORS][2] = {{710,850},{730,1100},{550,860},{500,960},{1000,1330}};  //default values
@@ -24,9 +27,21 @@ const int gestures[NUM_GESTURES][NUM_SENSORS] = {
 {0,0,0,2,0}, //ring
 {0,0,0,0,2} //little
 };
-int history[1000] = {0};
-int index = 1;
 
+int history[HIST_LENGTH] = {0};
+int index = 1;
+String curAction;
+const int** action;
+const int action_length[NUM_ACTIONS] = {3};
+String action_meaning[NUM_ACTIONS] = {"making a fist"};
+
+void setupActions(){
+  for(int i = 0;i<NUM_ACTIONS;i++){
+    action[i] = (int*)malloc(action_length[i]*sizeof(int));
+  }
+  int temp[3] = {0,1,0};
+  memcpy((int*)action[0],temp,3*sizeof(int));
+}
 
 void calibrateFlex(){
   for(int i = 0;i<NUM_SENSORS;i++){  //calibrate each sensor one by one
@@ -43,8 +58,8 @@ void calibrateFlex(){
   }
 }
 
-int* readGesture(){
-  int gesture[5];
+void readSensors(){
+  
   for(int i = 0;i < NUM_SENSORS;i++){
     val = analogRead(flexPins[i]);
     int base = ranges[i][0];
@@ -64,12 +79,12 @@ int* readGesture(){
       }
     }
   }
-  return gesture;
+
 }
 
 String processData(){
   data = "";
-  int* gesture = readGesture();
+  readSensors();
   for(int i = 0;i<NUM_SENSORS;i++){
     data += String(gesture[i]);
     data += ",";
@@ -83,8 +98,8 @@ bool reset(){
   }
 }
 
-int* detectGesture(){
-  int* gesture = readGesture();
+void detectGesture(){
+  readSensors();
   for(int i = 0;i<NUM_GESTURES;i++){
     bool valid = true;
     for(int j = 0;j<NUM_SENSORS;j++){
@@ -93,11 +108,11 @@ int* detectGesture(){
         break;
       }
       if(valid){
-        return gestures[i];
+        gesture = gestures[i];
       }
     }
   }
-  return nullptr;
+  gesture = nullptr;
 }
 
 bool cmpGestures(int* gesture1,int* gesture2){
@@ -109,6 +124,28 @@ bool cmpGestures(int* gesture1,int* gesture2){
   return true;
 }
 
+String detectAction(){
+  bool map[NUM_ACTIONS];
+  for(int i = 0;i<NUM_ACTIONS;i++){
+    map[i] = true;
+  }
+  for(int i = 0;i<MAX_ACTION_LENGTH;i++){
+    for(int j = 0;j<NUM_ACTIONS;j++){
+      if(action_length[j] <= i and map[j]){
+        if(history[index-i] != action[j][i]){ //will cause an error when MAX_ACTION_LENGTH > index (3 > 1) 
+          map[j] = false;
+        }
+      }
+    }
+  }
+  
+  for(int i = 0;i<NUM_ACTIONS;i++){
+    if(map[i]){
+      return action_meaning[i];
+    }
+  }
+  return NULL;
+}
 
 
 void setup() {
@@ -117,11 +154,12 @@ void setup() {
   Serial.begin(9600);
   espSerial.begin(9600);
   calibrateFlex();
+  setupActions();
 }
 
 void loop() {
   reset();
-  int* gesture = detectGesture();
+  detectGesture();
   if(gesture == nullptr){
     return;
   }
@@ -130,8 +168,11 @@ void loop() {
   }else{
     history[index++] = gesture;
   }
-  action = detectAction();
-  espSerial.println(data);
+  curAction = detectAction();
+  if(curAction == NULL){
+    return;
+  }
+  espSerial.println(curAction);
   Serial.println(data);
   delay(100);
 }
