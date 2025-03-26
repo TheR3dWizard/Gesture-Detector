@@ -3,54 +3,48 @@
 #include <SoftwareSerial.h>
 #define NUM_GESTURES 7
 #define BUTTON 7
-#define HIST_LENGTH 1000
+#define HIST_LENGTH 50
 #define NUM_ACTIONS 1
 #define MAX_ACTION_LENGTH 3
 
 int val = 0;
-int op = 0;
-int prevop = 0;
-boolean isDebug = false;
+boolean isDebug = true;
 String data = "";
 SoftwareSerial espSerial(10, 11);
 
-int* gesture;
-const int threshold[3] = {60,120,500}; // 3 levels of bending for each finger
-const int flexPins[NUM_SENSORS] = {A0,A1,A2,A3,A4};
-int ranges[NUM_SENSORS][2] = {{710,850},{730,1100},{550,860},{500,960},{1000,1330}};  //default values
-const int gestures[NUM_GESTURES][NUM_SENSORS] = {
-{0,0,0,0,0}, //palm outstretched
-{2,2,2,2,2}, //fist
-{2,0,0,0,0}, //thumb
-{0,2,0,0,0}, //index 
-{0,0,2,0,0}, //middle
-{0,0,0,2,0}, //ring
-{0,0,0,0,2} //little
+int gesture[NUM_SENSORS] = {0};
+
+const int threshold[3] PROGMEM = {60, 120, 500};
+const int flexPins[NUM_SENSORS] = {A0, A1, A2, A3, A4};
+int ranges[NUM_SENSORS][2] = {{710, 850}, {730, 1100}, {550, 860}, {500, 960}, {1000, 1330}};
+const int gestures[NUM_GESTURES][NUM_SENSORS] PROGMEM = {
+  {0, 0, 0, 0, 0},
+  {2, 2, 2, 2, 2},
+  {2, 0, 0, 0, 0},
+  {0, 2, 0, 0, 0},
+  {0, 0, 2, 0, 0},
+  {0, 0, 0, 2, 0},
+  {0, 0, 0, 0, 2}
 };
 
-int history[HIST_LENGTH] = {0};
-int index = 1;
-String curAction;
-const int** action;
-const int action_length[NUM_ACTIONS] = {3};
-String action_meaning[NUM_ACTIONS] = {"making a fist"};
+const String gesture_names[NUM_GESTURES] = {
+  "palm outstretched", "fist", "thumb", "index", "middle", "ring", "little"
+};
 
-void setupActions(){
-  for(int i = 0;i<NUM_ACTIONS;i++){
-    action[i] = (int*)malloc(action_length[i]*sizeof(int));
-  }
-  int temp[3] = {0,1,0};
-  memcpy((int*)action[0],temp,3*sizeof(int));
-}
+uint8_t history[HIST_LENGTH][NUM_SENSORS] = {0};
+int index = 0;
 
-void calibrateFlex(){
-  for(int i = 0;i<NUM_SENSORS;i++){  //calibrate each sensor one by one
+void calibrateFlex() {
+  Serial.println("Started calibration");
+  for (int i = 0; i < NUM_SENSORS; i++) {
     int minVal = 1023;
     int maxVal = 0;
-    for(int j = 0;j<1000;){
+    Serial.print("Calibrating for finger: ");
+    Serial.println(i);
+    for (int j = 0; j < 1000; j++) {
       val = analogRead(flexPins[i]);
-      minVal = min(minVal,val);
-      maxVal = max(maxVal,val);
+      minVal = min(minVal, val);
+      maxVal = max(maxVal, val);
       delay(1);
     }
     ranges[i][0] = minVal;
@@ -58,121 +52,57 @@ void calibrateFlex(){
   }
 }
 
-void readSensors(){
-  
-  for(int i = 0;i < NUM_SENSORS;i++){
+void readSensors() {
+  for (int i = 0; i < NUM_SENSORS; i++) {
     val = analogRead(flexPins[i]);
     int base = ranges[i][0];
     int ceiling = ranges[i][1];
-    op = map(val,base,ceiling,0,180);
+    int op = map(val, base, ceiling, 0, 180);
 
-    if(isDebug){
-      Serial.print(val); //raw value
-      Serial.print(",");
-      Serial.print(op); //mapped value
-    }
 
-    for(int i = 0;i < 3;i++){
-      if(op < threshold[i]){
-        gesture[i] = i;
+    for (int j = 0; j < 3; j++) {
+      if (op < threshold[j]) {
+        gesture[i] = j;
+        Serial.print(String(gesture[i])+",");
         break;
       }
     }
   }
-
+  Serial.println();
 }
 
-String processData(){
-  data = "";
-  readSensors();
-  for(int i = 0;i<NUM_SENSORS;i++){
-    data += String(gesture[i]);
-    data += ",";
-  }
-  return data;
-}
-
-bool reset(){
-  if(digitalRead(BUTTON)){
-    calibrateFlex();
-  }
-}
-
-void detectGesture(){
-  readSensors();
-  for(int i = 0;i<NUM_GESTURES;i++){
+void detectGesture() {
+  for (int i = 0; i < NUM_GESTURES; i++) {
     bool valid = true;
-    for(int j = 0;j<NUM_SENSORS;j++){
-      if(gesture[j]!=gestures[i][j]){
+    for (int j = 0; j < NUM_SENSORS; j++) {
+      if (gesture[j] != pgm_read_word(&gestures[i][j])) {
         valid = false;
         break;
       }
-      if(valid){
-        gesture = gestures[i];
-      }
+    }
+    if (valid) {
+      Serial.println(gesture_names[i] + " is detected");
+      return;
     }
   }
-  gesture = nullptr;
+  Serial.println("No gesture detected");
 }
-
-bool cmpGestures(int* gesture1,int* gesture2){
-  for(int i = 0;i<NUM_SENSORS;i++){
-    if(gesture1[i]!=gesture2[i]){
-      return false;
-    }
-  }
-  return true;
-}
-
-String detectAction(){
-  bool map[NUM_ACTIONS];
-  for(int i = 0;i<NUM_ACTIONS;i++){
-    map[i] = true;
-  }
-  for(int i = 0;i<MAX_ACTION_LENGTH;i++){
-    for(int j = 0;j<NUM_ACTIONS;j++){
-      if(action_length[j] <= i and map[j]){
-        if(history[index-i] != action[j][i]){ //will cause an error when MAX_ACTION_LENGTH > index (3 > 1) 
-          map[j] = false;
-        }
-      }
-    }
-  }
-  
-  for(int i = 0;i<NUM_ACTIONS;i++){
-    if(map[i]){
-      return action_meaning[i];
-    }
-  }
-  return NULL;
-}
-
 
 void setup() {
-  pinMode(LED,OUTPUT);
-  digitalWrite(LED,HIGH);
   Serial.begin(9600);
+  pinMode(LED, OUTPUT);
+  digitalWrite(LED, HIGH);
   espSerial.begin(9600);
   calibrateFlex();
-  setupActions();
 }
 
 void loop() {
-  reset();
+  readSensors();
   detectGesture();
-  if(gesture == nullptr){
-    return;
+  delay(500);
+
+  for (int i = 0; i < NUM_SENSORS; i++) {
+    history[index][i] = gesture[i];
   }
-  if(cmpGestures(gesture,history[index-1])){
-    return;
-  }else{
-    history[index++] = gesture;
-  }
-  curAction = detectAction();
-  if(curAction == NULL){
-    return;
-  }
-  espSerial.println(curAction);
-  Serial.println(data);
-  delay(100);
-}
+  index = (index + 1) % HIST_LENGTH;
+} 
