@@ -15,18 +15,18 @@ SoftwareSerial espSerial(10, 11);
 
 int gesture[NUM_SENSORS] = {0};
 
-const int threshold[3] PROGMEM = {60, 120, 500};
+const int threshold[2] PROGMEM = {60,500};
 const int flexPins[NUM_SENSORS] = {A0, A1, A2, A3, A4};
 int ranges[NUM_SENSORS][2] = {{710, 850}, {730, 1100}, {550, 860}, {500, 960}, {1000, 1330}};
 const int gestures[NUM_GESTURES][NUM_SENSORS] PROGMEM = {
   {0, 0, 0, 0, 0},
-  {2, 2, 2, 2, 2},
-  {2, 0, 0, 0, 0},
-  {0, 2, 0, 0, 0},
-  {0, 0, 2, 0, 0},
-  {0, 0, 0, 2, 0},
-  {0, 0, 0, 0, 2},
-  {2,0,2,2,2}
+  {1,1,1,1,1},
+  {1, 0, 0, 0, 0},
+  {0, 1, 0, 0, 0},
+  {0, 0, 1, 0, 0},
+  {0, 0, 0, 1, 0},
+  {0, 0, 0, 0, 1},
+  {1,0,1,1,1}
 };
 
 const String gesture_names[NUM_GESTURES] = {
@@ -77,7 +77,7 @@ void readSensors() {
     int op = map(val, base, ceiling, 0, 180);
 
 
-    for (int j = 0; j < 3; j++) {
+    for (int j = 0; j < 2; j++) {
       if (op < threshold[j]) {
         gesture[i] = j;
         Serial.print(String(gesture[i])+",");

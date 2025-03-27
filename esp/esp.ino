@@ -42,39 +42,16 @@ void setup() {
 void loop() {
     if (mySerial.available()) {
         String readval = mySerial.readStringUntil('\n');
-        readval.trim(); // Trim removes spaces & newlines
+        readval.trim(); 
         
         if (readval.length() > 0) {
             Serial.print("Received Data: ");
             Serial.println(readval);
             
-            int index = 0;
-            int start = 0;
-            int end = readval.indexOf(',');
-
-            // Initialize values to 0 (prevents uninitialized access)
-            memset(values, 0, sizeof(values));
-
-            while (end != -1 && index < MAX_VALUES) {
-                values[index] = readval.substring(start, end).toInt();
-                index++;
-                start = end + 1;
-                end = readval.indexOf(',', start);
-            }
-
-            // Last value (after the last comma)
-            if (index < MAX_VALUES) {
-                values[index] = readval.substring(start).toInt();
-            }
 
             // Check WiFi before sending data
             if (WiFi.status() == WL_CONNECTED) {
-                for (int i = 0; i < MAX_VALUES; i++) {
-                    ThingSpeak.writeField(myChannelNumber, i + 1, values[i], myWriteAPIKey);
-                    Serial.print("Uploaded Value: ");
-                    Serial.println(values[i]);
-                    delay(15000); // Respect ThingSpeak rate limit
-                }
+              ThingSpeak.writeField(myChannelNumber, 6, readval, myWriteAPIKey);  
             } else {
                 Serial.println("WiFi Disconnected! Skipping upload.");
             }
